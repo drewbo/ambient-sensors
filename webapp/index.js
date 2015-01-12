@@ -1,16 +1,19 @@
-var fs = require('fs');
+'use strict';
+
 var moment = require('moment'); 
 var express = require('express');
 var app = express();
 
 // Serial data is a singleton.
 var serialData = require('./app/utils/serialData');
-var SerialPort = require("serialport").SerialPort;
-var SerialParsers = require("serialport").parsers;
+var SerialPort = require('serialport').SerialPort;
+var SerialParsers = require('serialport').parsers;
 
 // The data since start.
 var sensorData = {
-  temp: []
+  temp: [],
+  mic: [],
+  pir: []
 };
 
 ///////////////////////////////////////////////////////////
@@ -23,11 +26,11 @@ var serialport = new SerialPort('COM6', {
   parity: 'none',
   stopBits: 1,
   flowControl: false,
-  parser: SerialParsers.readline("\r")
+  parser: SerialParsers.readline('\r')
 });
 
 serialport.on('open', function(){
-  console.log('Serial Port Opend');
+  console.log('Serial Port Opened');
 })
 .on('data', function(data) {
   // Send data for processing.
@@ -36,10 +39,12 @@ serialport.on('open', function(){
 
 // SerialData listener
 serialData.listen('tempReading', '^TMP:-?([0-9]+\.[0-9]+)$');
+serialData.listen('micReading', '^MIC:-?([0-1])$');
+serialData.listen('pirReading', '^PIR:-?([0-1])$');
 
 // SerialData events.
 serialData.on('sysnote', function(data) {
-  if (data == 'Setup Complete') {
+  if (data === 'Setup Complete') {
     // Arduino is setup.
     console.log('Setup Complete');
     startServer();
@@ -64,6 +69,28 @@ serialData.on('tempReading', function(tmp) {
   console.log(date, data);
 });
 
+serialData.on('micReading', function(tmp) {
+  var soundDetected = tmp;
+  var date = moment().format('YYYY-MM-DD H:mm:ss');
+  var data = {
+    date: date,
+    value: soundDetected
+  };
+  sensorData.mic.push(data);
+  console.log(date, data);
+});
+
+serialData.on('pirReading', function(tmp) {
+  var motionDetected = tmp;
+  var date = moment().format('YYYY-MM-DD H:mm:ss');
+  var data = {
+    date: date,
+    value: motionDetected
+  };
+  sensorData.pir.push(data);
+  console.log(date, data);
+});
+
 ///////////////////////////////////////////////////////////
 // Express
 
@@ -79,10 +106,12 @@ app.get('/sensor/:sensor?', function (req, res) {
   switch(req.params.sensor) {
     case 'temperature':
       return res.send(sensorData.temp);
-    break;
+    case 'infrared':
+      return res.send(sensorData.pir);
+    case 'microphone':
+      return res.send(sensorData.mic);      
     default:
       return res.send(sensorData);
-    break;
   }
   
 });
