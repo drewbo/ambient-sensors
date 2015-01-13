@@ -36,11 +36,14 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
       var socket = io();
+
+      var tempData = [];
       socket.on('initialData', function (data) {
         console.log(data);
       });
       socket.on('tempReading', function (data) {
-        console.log(data);
+        data.date = parseDate(data.date);
+        tempData.push(data)
       });
       socket.on('micReading', function (data) {
         console.log(data);
@@ -100,45 +103,29 @@
         .attr("width", width)
         .attr("height", height);
 
-      // Get the data
-      d3.csv("data.csv", function(error, data) {
+      // Scale the range of the data
+      x.domain(d3.extent(tempData, function(d) {
+        return d.date;
+      }));
+      y.domain([10, 26]);
 
-        data.forEach(function(d) {
-          d.date = parseDate(d.date);
-        });
+      // Add the valueline path and it's clipPath
+      svg.append("g").attr("clip-path", "url(#clip)").append("path").attr("class", "line").attr("d", valueline(tempData));
 
-        // Scale the range of the data
-        x.domain(d3.extent(data, function(d) {
-          return d.date;
-        }));
-        y.domain([10, 26]);
+      // Add the X Axis
+      svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")").call(xAxis);
 
-        // Add the valueline path and it's clipPath
-        svg.append("g").attr("clip-path", "url(#clip)").append("path").attr("class", "line").attr("d", valueline(data));
+      // Add the Y Axis
+      svg.append("g").attr("class", "y axis").call(yAxis);
 
-        // Add the X Axis
-        svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")").call(xAxis);
 
-        // Add the Y Axis
-        svg.append("g").attr("class", "y axis").call(yAxis);
-
-      });
 
       var duration = 1000;
 
       setInterval(function() {
-        // Get the data
-        d3.csv("data.csv", function(error, data) {
-          data.forEach(function(d) {
-            d.date = parseDate(d.date);
-            d.close = +d.close;
-          });
-
-          // only take a portion of the data
-          data = data.slice(Math.max(data.length - 32, 1))
 
           // Scale the range of the data (minus two!)
-          x.domain(d3.extent(data.slice(0,-2), function(d) {
+          x.domain(d3.extent(tempData.slice(0,-2), function(d) {
             return d.date;
           }));
 
@@ -146,14 +133,14 @@
           var svg = d3.select("#temp-chart")
 
           // Redraw the line
-          var line = svg.select(".line").attr("d", valueline(data)).attr("transform","translate(0)")// redraw the line
+          var line = svg.select(".line").attr("d", valueline(tempData)).attr("transform","translate(0)")// redraw the line
 
-          // not sure why we had to add the delay and non-full length duration but it (sometimes) works and isn't especially noticable
-          line.transition().ease("linear").duration(duration-100).delay(50).attr("transform", "translate(" + -x(data[1].date) + ")"); // slide it over
+          line.transition().ease("linear").duration(duration-50).delay(30).attr("transform", "translate(" + -x(tempData[1].date) + ")"); // slide it over
           svg.select(".x.axis")// change the x axis
           .transition().ease("linear").duration(duration).call(xAxis);
 
-        });
+          if (tempData.length > 30) tempData.shift(); // push out the first item
+
       }, duration);
     </script>
   </body>

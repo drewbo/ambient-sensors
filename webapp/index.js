@@ -1,8 +1,10 @@
 'use strict';
 
-var moment = require('moment'); 
+var moment = require('moment');
 var express = require('express');
 var app = express();
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
 
 // Serial data is a singleton.
 var serialData = require('./app/utils/serialData');
@@ -72,6 +74,16 @@ serialData.on('tempReading', function(tmp) {
   io.emit('tempReading', data);
 });
 
+setInterval(function(){
+  var date = moment().format('YYYY-MM-DD H:mm:ss');
+  var temp = Math.random() * 14 + 11;
+  var data = {
+    date: date,
+    value: temp
+  };
+  io.emit('tempReading', data);
+},1000)
+
 serialData.on('micReading', function(tmp) {
   var soundDetected = tmp;
   var date = moment().format('YYYY-MM-DD H:mm:ss');
@@ -95,7 +107,7 @@ serialData.on('pirReading', function(tmp) {
   };
   sensorData.pir.push(data);
   console.log(date, data);
-  
+
   // Send via websocket
   io.emit('pirReading', data);
 });
@@ -111,18 +123,18 @@ app.get('/sensor/:sensor?', function (req, res) {
   if (!req.params.sensor) {
     return res.send(sensorData);
   }
-  
+
   switch(req.params.sensor) {
     case 'temperature':
       return res.send(sensorData.temp);
     case 'infrared':
       return res.send(sensorData.pir);
     case 'microphone':
-      return res.send(sensorData.mic);      
+      return res.send(sensorData.mic);
     default:
       return res.send(sensorData);
   }
-  
+
 });
 
 ///////////////////////////////////////////////////////////
@@ -137,4 +149,3 @@ function startServer() {
     console.log('App listening at http:localhost:3000');
   });
 }
-
