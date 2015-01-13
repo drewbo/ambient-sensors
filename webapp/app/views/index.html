@@ -12,13 +12,13 @@
         font: 12px Arial;
         padding: 20px;
       }
-      
-      path { 
+
+      path {
         stroke: steelblue;
         stroke-width: 2;
         fill: none;
       }
-      
+
       .axis path,
       .axis line {
         fill: none;
@@ -63,7 +63,7 @@
 
       // Define the line
       var valueline = d3.svg.line()
-        .interpolate("cardinal")   
+        .interpolate("cardinal")
         .x(function(d) {
           return x(d.date);
         })
@@ -79,9 +79,17 @@
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+      // append a clip path to keep our outer control points invisible
+
+      svg.append("defs").append("clipPath")
+        .attr("id", "clip")
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height);
+
       // Get the data
-      d3.json("http://localhost:3000/sensor/temperature", function(error, data) {
-      
+      d3.csv("data.csv", function(error, data) {
+
         data.forEach(function(d) {
           d.date = parseDate(d.date);
         });
@@ -92,8 +100,8 @@
         }));
         y.domain([10, 26]);
 
-        // Add the valueline path.
-        svg.append("path").attr("class", "line").attr("d", valueline(data));
+        // Add the valueline path and it's clipPath
+        svg.append("g").attr("clip-path", "url(#clip)").append("path").attr("class", "line").attr("d", valueline(data));
 
         // Add the X Axis
         svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")").call(xAxis);
@@ -102,31 +110,38 @@
         svg.append("g").attr("class", "y axis").call(yAxis);
 
       });
-      
+
+      var duration = 1000;
+
       setInterval(function() {
         // Get the data
-        d3.json("http://localhost:3000/sensor/temperature", function(error, data) {
+        d3.csv("data.csv", function(error, data) {
           data.forEach(function(d) {
             d.date = parseDate(d.date);
             d.close = +d.close;
           });
-          
-          // Scale the range of the data
-          x.domain(d3.extent(data, function(d) {
+
+          // only take a portion of the data
+          data = data.slice(Math.max(data.length - 32, 1))
+
+          // Scale the range of the data (minus two!)
+          x.domain(d3.extent(data.slice(0,-2), function(d) {
             return d.date;
           }));
-          
-          // Select the section we want to apply our changes to
-          var svg = d3.select("#temp-chart").transition();
 
-          // Make the changes
-          svg.select(".line")// change the line
-          .duration(750).attr("d", valueline(data));
+          // Select the section we want to apply our changes to
+          var svg = d3.select("#temp-chart")
+
+          // Redraw the line
+          var line = svg.select(".line").attr("d", valueline(data)).attr("transform","translate(0)")// redraw the line
+
+          // not sure why we had to add the delay and non-full length duration but it (sometimes) works and isn't especially noticable
+          line.transition().ease("linear").duration(duration-100).delay(50).attr("transform", "translate(" + -x(data[1].date) + ")"); // slide it over
           svg.select(".x.axis")// change the x axis
-          .duration(750).call(xAxis);
-          
+          .transition().ease("linear").duration(duration).call(xAxis);
+
         });
-      }, 10000);
+      }, duration);
     </script>
   </body>
 </html>
