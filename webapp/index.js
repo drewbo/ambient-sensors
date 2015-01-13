@@ -18,8 +18,8 @@ var sensorData = {
 
 ///////////////////////////////////////////////////////////
 // Setup Arduino connection through serialport.
-
-var serialport = new SerialPort('COM6', {
+startServer();
+var serialport = new SerialPort('/dev/null', {
   baudrate: 115200,
   // defaults for Arduino serial communication
   dataBits: 8,
@@ -67,6 +67,9 @@ serialData.on('tempReading', function(tmp) {
   };
   sensorData.temp.push(data);
   console.log(date, data);
+
+  // Send via websocket
+  io.emit('tempReading', data);
 });
 
 serialData.on('micReading', function(tmp) {
@@ -78,6 +81,9 @@ serialData.on('micReading', function(tmp) {
   };
   sensorData.mic.push(data);
   console.log(date, data);
+
+  // Send via websocket
+  io.emit('micReading', data);
 });
 
 serialData.on('pirReading', function(tmp) {
@@ -89,6 +95,9 @@ serialData.on('pirReading', function(tmp) {
   };
   sensorData.pir.push(data);
   console.log(date, data);
+  
+  // Send via websocket
+  io.emit('pirReading', data);
 });
 
 ///////////////////////////////////////////////////////////
@@ -116,8 +125,15 @@ app.get('/sensor/:sensor?', function (req, res) {
   
 });
 
+///////////////////////////////////////////////////////////
+// Socket.io
+io.on('connection', function(socket) {
+  console.log('a user connected');
+  io.emit('initialData', sensorData);
+});
+
 function startServer() {
-  app.listen(3000, function () {
+  http.listen(3000, function () {
     console.log('App listening at http:localhost:3000');
   });
 }
